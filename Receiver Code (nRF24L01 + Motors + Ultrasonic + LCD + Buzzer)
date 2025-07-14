@@ -1,0 +1,146 @@
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+#include <LiquidCrystal.h>
+
+RF24 radio(9, 10);
+const byte address[6] = "00001";
+String receivedGesture = "";
+
+#define ENA 5
+#define IN1 6
+#define IN2 7
+#define IN3 8
+#define IN4 4
+#define ENB 3
+
+#define trigPin 2
+#define echoPin 12
+#define buzzer 11
+
+LiquidCrystal lcd(13, A0, A1, A2, A3, A4);
+
+long duration;
+int distance;
+
+void setup() {
+  Serial.begin(9600);
+  lcd.begin(16, 2);
+
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(buzzer, OUTPUT);
+
+  radio.begin();
+  radio.openReadingPipe(0, address);
+  radio.setPALevel(RF24_PA_LOW);
+  radio.setDataRate(RF24_250KBPS);
+  radio.startListening();
+}
+
+void loop() {
+  if (radio.available()) {
+    char text[32] = "";
+    radio.read(&text, sizeof(text));
+    receivedGesture = String(text);
+    Serial.println(receivedGesture);
+  }
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+
+  if (distance < 15) {
+    stopCar();
+    digitalWrite(buzzer, HIGH);
+    lcd.setCursor(0, 0);
+    lcd.print("Obstacle Detected");
+    lcd.setCursor(0, 1);
+    lcd.print("Distance: ");
+    lcd.print(distance);
+    lcd.print(" cm");
+    delay(500);
+    return;
+  } else {
+    digitalWrite(buzzer, LOW);
+  }
+
+  if (receivedGesture == "FWD") {
+    moveForward();
+    lcd.setCursor(0, 0);
+    lcd.print("Moving Forward  ");
+  } else if (receivedGesture == "BACK") {
+    moveBackward();
+    lcd.setCursor(0, 0);
+    lcd.print("Moving Backward ");
+  } else if (receivedGesture == "LEFT") {
+    turnLeft();
+    lcd.setCursor(0, 0);
+    lcd.print("Turning Left    ");
+  } else if (receivedGesture == "RIGHT") {
+    turnRight();
+    lcd.setCursor(0, 0);
+    lcd.print("Turning Right   ");
+  } else {
+    stopCar();
+    lcd.setCursor(0, 0);
+    lcd.print("Stopped         ");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("Speed: 80 PWM   ");
+}
+
+void moveForward() {
+  analogWrite(ENA, 80);
+  analogWrite(ENB, 80);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void moveBackward() {
+  analogWrite(ENA, 80);
+  analogWrite(ENB, 80);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+
+void turnLeft() {
+  analogWrite(ENA, 60);
+  analogWrite(ENB, 60);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void turnRight() {
+  analogWrite(ENA, 60);
+  analogWrite(ENB, 60);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+
+void stopCar() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
